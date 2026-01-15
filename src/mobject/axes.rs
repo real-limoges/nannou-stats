@@ -280,7 +280,6 @@ impl Mobject for Axes3D {
     fn draw(&self, draw: &Draw, t: f32) {
         let style = self.style.with_opacity(self.style.opacity);
 
-        // Colors for each axis
         let x_color = rgba(1.0, 0.3, 0.3, style.stroke_color.alpha); // Red-ish
         let y_color = rgba(0.3, 1.0, 0.3, style.stroke_color.alpha); // Green-ish
         let z_color = rgba(0.3, 0.3, 1.0, style.stroke_color.alpha); // Blue-ish

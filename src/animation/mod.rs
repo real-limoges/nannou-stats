@@ -10,17 +10,13 @@ pub use transform::{MoveTo, Rotate, Scale, Shift};
 
 /// Core trait for all animations
 pub trait Animation: Send + Sync {
-    /// Duration of this animation in seconds
+    /// in seconds
     fn duration(&self) -> f32;
 
-    /// The ID of the mobject this animation targets
     fn target_id(&self) -> MobjectId;
 
-    /// Apply this animation to a mobject at time t (0.0 to 1.0)
-    /// Returns the interpolated progress after applying easing
     fn apply(&self, mobject: &mut dyn Mobject, t: f32);
-
-    /// Clone this animation into a boxed trait object
+    
     fn clone_box(&self) -> Box<dyn Animation>;
 }
 

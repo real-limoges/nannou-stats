@@ -3,32 +3,19 @@ use std::f32::consts::PI;
 /// Easing functions for smooth animations
 #[derive(Debug, Clone, Copy, Default)]
 pub enum Easing {
-    /// Constant speed
     Linear,
-    /// Smooth start and end (default, like Manim)
     #[default]
     Smooth,
-    /// Accelerate from zero
     EaseInQuad,
-    /// Decelerate to zero
     EaseOutQuad,
-    /// Accelerate then decelerate
     EaseInOutQuad,
-    /// Stronger acceleration
     EaseInCubic,
-    /// Stronger deceleration
     EaseOutCubic,
-    /// Stronger accel/decel
     EaseInOutCubic,
-    /// Sinusoidal ease in/out
     EaseInOutSine,
-    /// Exponential ease in
     EaseInExpo,
-    /// Exponential ease out
     EaseOutExpo,
-    /// Overshoot then settle (elastic feel)
     EaseOutBack,
-    /// Bounce at the end
     EaseOutBounce,
 }
 

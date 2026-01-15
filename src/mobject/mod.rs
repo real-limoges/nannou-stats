@@ -26,28 +26,16 @@ impl Default for MobjectId {
 
 /// Core trait for all drawable mathematical objects
 pub trait Mobject: Send + Sync {
-    /// Draw the mobject. `t` is the animation progress (0.0 to 1.0)
     fn draw(&self, draw: &Draw, t: f32);
-
-    /// Get the bounding box of this mobject
     fn bounding_box(&self) -> Rect;
 
-    /// Get the center position
     fn center(&self) -> Vec2;
-
-    /// Set the center position
     fn set_center(&mut self, pos: Vec2);
 
-    /// Get the current opacity (0.0 to 1.0)
     fn opacity(&self) -> f32;
-
-    /// Set the opacity (0.0 to 1.0)
     fn set_opacity(&mut self, opacity: f32);
 
-    /// Get the unique ID of this mobject
     fn id(&self) -> MobjectId;
-
-    /// Clone this mobject into a boxed trait object
     fn clone_box(&self) -> Box<dyn Mobject>;
 }
 
