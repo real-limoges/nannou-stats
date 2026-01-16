@@ -16,7 +16,7 @@ pub trait Animation: Send + Sync {
     fn target_id(&self) -> MobjectId;
 
     fn apply(&self, mobject: &mut dyn Mobject, t: f32);
-    
+
     fn clone_box(&self) -> Box<dyn Animation>;
 }
 

@@ -1,9 +1,13 @@
 use nannou::prelude::*;
 
 pub mod axes;
+pub mod curve;
+pub mod scatter;
 pub mod shapes;
 
 pub use axes::{Axes2D, Axes3D};
+pub use curve::{ConfidenceBand, Curve};
+pub use scatter::{MarkerShape, ScatterPlot};
 pub use shapes::{Arrow, Circle, Line, Rectangle};
 
 /// Unique identifier for mobjects in a scene

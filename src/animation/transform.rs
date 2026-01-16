@@ -119,6 +119,7 @@ impl Animation for Shift {
 #[derive(Debug, Clone)]
 pub struct Scale {
     target: MobjectId,
+    #[allow(dead_code)]
     factor: f32,
     duration: f32,
     easing: Easing,
@@ -171,6 +172,7 @@ impl Animation for Scale {
 #[derive(Debug, Clone)]
 pub struct Rotate {
     target: MobjectId,
+    #[allow(dead_code)]
     angle: f32, // radians
     duration: f32,
     easing: Easing,

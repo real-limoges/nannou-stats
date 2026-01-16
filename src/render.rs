@@ -137,10 +137,7 @@ impl Renderer {
         if status.success() {
             Ok(output_path)
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "ffmpeg failed to create video",
-            ))
+            Err(std::io::Error::other("ffmpeg failed to create video"))
         }
     }
 
