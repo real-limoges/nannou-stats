@@ -1,5 +1,5 @@
-use super::{Mobject, MobjectId, MobjectStyle};
-use nannou::prelude::*;
+use super::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
+use macroquad::prelude::*;
 
 /// Point marker shapes for scatter plots
 #[derive(Debug, Clone, Copy, Default)]
@@ -21,7 +21,9 @@ pub struct ScatterPlot {
     marker: MarkerShape,
     style: MobjectStyle,
     /// Optional per-point colors (for coloring by value/residual/cluster)
-    point_colors: Option<Vec<Rgba>>,
+    point_colors: Option<Vec<Color>>,
+    scale: f32,
+    rotation: f32,
 }
 
 impl ScatterPlot {
@@ -33,12 +35,14 @@ impl ScatterPlot {
             point_radius: 4.0,
             marker: MarkerShape::Circle,
             style: MobjectStyle {
-                stroke_color: rgba(0.0, 0.0, 0.0, 0.0),
-                fill_color: rgba(0.3, 0.6, 1.0, 0.8),
+                stroke_color: Color::new(0.0, 0.0, 0.0, 0.0),
+                fill_color: Color::new(0.3, 0.6, 1.0, 0.8),
                 stroke_weight: 1.0,
                 opacity: 1.0,
             },
             point_colors: None,
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -67,13 +71,13 @@ impl ScatterPlot {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.fill_color = color.into();
+    pub fn color(mut self, color: Color) -> Self {
+        self.style.fill_color = color;
         self
     }
 
-    pub fn stroke_color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn stroke_color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
@@ -82,7 +86,7 @@ impl ScatterPlot {
         self
     }
 
-    pub fn point_colors(mut self, colors: Vec<Rgba>) -> Self {
+    pub fn point_colors(mut self, colors: Vec<Color>) -> Self {
         self.point_colors = Some(colors);
         self
     }
@@ -90,7 +94,7 @@ impl ScatterPlot {
     /// Color points using a value-to-color mapping function
     pub fn color_by<F>(mut self, values: &[f32], color_fn: F) -> Self
     where
-        F: Fn(f32) -> Rgba,
+        F: Fn(f32) -> Color,
     {
         self.point_colors = Some(values.iter().map(|&v| color_fn(v)).collect());
         self
@@ -116,14 +120,14 @@ impl Default for ScatterPlot {
 }
 
 impl Mobject for ScatterPlot {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         let style = self.style.with_opacity(self.style.opacity);
 
         // Calculate how many points to show based on animation progress
         let points_to_draw = ((self.points.len() as f32) * t).ceil() as usize;
 
         for (i, point) in self.points.iter().take(points_to_draw).enumerate() {
-            let screen_pos = self.center + *point;
+            let screen_pos = to_screen(self.center + *point, screen_center);
 
             // Get color for this point
             let fill_color = self
@@ -133,88 +137,117 @@ impl Mobject for ScatterPlot {
                 .unwrap_or(style.fill_color);
 
             // Apply opacity to the fill color
-            let fill_with_opacity = rgba(
-                fill_color.red,
-                fill_color.green,
-                fill_color.blue,
-                fill_color.alpha * style.opacity,
+            let fill_with_opacity = Color::new(
+                fill_color.r,
+                fill_color.g,
+                fill_color.b,
+                fill_color.a * style.opacity,
             );
 
             match self.marker {
                 MarkerShape::Circle => {
-                    let mut ellipse = draw.ellipse().xy(screen_pos).radius(self.point_radius);
-
-                    if fill_with_opacity.alpha > 0.0 {
-                        ellipse = ellipse.color(fill_with_opacity);
-                    } else {
-                        ellipse = ellipse.no_fill();
+                    if fill_with_opacity.a > 0.0 {
+                        draw_circle(
+                            screen_pos.x,
+                            screen_pos.y,
+                            self.point_radius,
+                            fill_with_opacity,
+                        );
                     }
 
-                    if style.stroke_color.alpha > 0.0 {
-                        ellipse
-                            .stroke(style.stroke_color)
-                            .stroke_weight(style.stroke_weight);
+                    if style.stroke_color.a > 0.0 {
+                        draw_circle_lines(
+                            screen_pos.x,
+                            screen_pos.y,
+                            self.point_radius,
+                            style.stroke_weight,
+                            style.stroke_color,
+                        );
                     }
                 }
                 MarkerShape::Square => {
                     let size = self.point_radius * 2.0;
-                    let mut rect = draw.rect().xy(screen_pos).w_h(size, size);
+                    let half = self.point_radius;
 
-                    if fill_with_opacity.alpha > 0.0 {
-                        rect = rect.color(fill_with_opacity);
-                    } else {
-                        rect = rect.no_fill();
+                    if fill_with_opacity.a > 0.0 {
+                        draw_rectangle(
+                            screen_pos.x - half,
+                            screen_pos.y - half,
+                            size,
+                            size,
+                            fill_with_opacity,
+                        );
                     }
 
-                    if style.stroke_color.alpha > 0.0 {
-                        rect.stroke(style.stroke_color)
-                            .stroke_weight(style.stroke_weight);
+                    if style.stroke_color.a > 0.0 {
+                        draw_rectangle_lines(
+                            screen_pos.x - half,
+                            screen_pos.y - half,
+                            size,
+                            size,
+                            style.stroke_weight,
+                            style.stroke_color,
+                        );
                     }
                 }
                 MarkerShape::Diamond => {
                     let r = self.point_radius;
                     let points = [
-                        screen_pos + vec2(0.0, r),
-                        screen_pos + vec2(r, 0.0),
-                        screen_pos + vec2(0.0, -r),
-                        screen_pos + vec2(-r, 0.0),
+                        vec2(screen_pos.x, screen_pos.y - r),
+                        vec2(screen_pos.x + r, screen_pos.y),
+                        vec2(screen_pos.x, screen_pos.y + r),
+                        vec2(screen_pos.x - r, screen_pos.y),
                     ];
 
-                    if fill_with_opacity.alpha > 0.0 {
-                        draw.quad()
-                            .points(points[0], points[1], points[2], points[3])
-                            .color(fill_with_opacity);
+                    if fill_with_opacity.a > 0.0 {
+                        // Draw as two triangles
+                        draw_triangle(points[0], points[1], points[2], fill_with_opacity);
+                        draw_triangle(points[0], points[2], points[3], fill_with_opacity);
                     }
 
-                    if style.stroke_color.alpha > 0.0 {
-                        draw.polyline()
-                            .weight(style.stroke_weight)
-                            .points([points[0], points[1], points[2], points[3], points[0]])
-                            .color(style.stroke_color);
+                    if style.stroke_color.a > 0.0 {
+                        for j in 0..4 {
+                            let next = (j + 1) % 4;
+                            draw_line(
+                                points[j].x,
+                                points[j].y,
+                                points[next].x,
+                                points[next].y,
+                                style.stroke_weight,
+                                style.stroke_color,
+                            );
+                        }
                     }
                 }
                 MarkerShape::Cross => {
                     let r = self.point_radius;
+                    let weight = style.stroke_weight.max(2.0);
                     // Vertical line
-                    draw.line()
-                        .start(screen_pos + vec2(0.0, -r))
-                        .end(screen_pos + vec2(0.0, r))
-                        .color(fill_with_opacity)
-                        .stroke_weight(style.stroke_weight.max(2.0));
+                    draw_line(
+                        screen_pos.x,
+                        screen_pos.y - r,
+                        screen_pos.x,
+                        screen_pos.y + r,
+                        weight,
+                        fill_with_opacity,
+                    );
                     // Horizontal line
-                    draw.line()
-                        .start(screen_pos + vec2(-r, 0.0))
-                        .end(screen_pos + vec2(r, 0.0))
-                        .color(fill_with_opacity)
-                        .stroke_weight(style.stroke_weight.max(2.0));
+                    draw_line(
+                        screen_pos.x - r,
+                        screen_pos.y,
+                        screen_pos.x + r,
+                        screen_pos.y,
+                        weight,
+                        fill_with_opacity,
+                    );
                 }
             }
         }
     }
 
-    fn bounding_box(&self) -> Rect {
+    fn bounding_box(&self) -> BoundingRect {
         if self.points.is_empty() {
-            return Rect::from_xy_wh(self.center, Vec2::ZERO);
+            return BoundingRect::from_xy_wh(self.center, Vec2::ZERO);
         }
 
         let min = self
@@ -226,7 +259,7 @@ impl Mobject for ScatterPlot {
             .iter()
             .fold(Vec2::splat(f32::MIN), |acc, p| acc.max(*p));
 
-        Rect::from_corners(self.center + min, self.center + max)
+        BoundingRect::from_corners(self.center + min, self.center + max)
     }
 
     fn center(&self) -> Vec2 {
@@ -243,6 +276,22 @@ impl Mobject for ScatterPlot {
 
     fn set_opacity(&mut self, opacity: f32) {
         self.style.opacity = opacity;
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
     }
 
     fn id(&self) -> MobjectId {

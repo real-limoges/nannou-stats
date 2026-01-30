@@ -1,6 +1,6 @@
-//! # Nannou-Stats
+//! # Maquette
 //!
-//! A Manim-inspired visualization framework built on nannou.
+//! A Manim-inspired visualization framework built on macroquad.
 //!
 //! ## Quick Start
 /*
@@ -24,13 +24,13 @@ pub mod state;
 pub mod timeline;
 
 pub mod prelude {
-    pub use nannou::prelude::*;
+    pub use macroquad::prelude::*;
 
     // Mobjects
     pub use crate::mobject::{Arrow, Circle, Line, Rectangle};
     pub use crate::mobject::{Axes2D, Axes3D};
+    pub use crate::mobject::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
     pub use crate::mobject::{ConfidenceBand, Curve, MarkerShape, ScatterPlot};
-    pub use crate::mobject::{Mobject, MobjectId, MobjectStyle};
 
     // Animations
     pub use crate::animation::{Animation, Easing};

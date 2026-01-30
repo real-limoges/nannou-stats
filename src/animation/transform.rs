@@ -1,6 +1,6 @@
 use super::{Animation, Easing};
 use crate::mobject::{Mobject, MobjectId};
-use nannou::prelude::*;
+use macroquad::prelude::*;
 
 /// Move to an absolute position
 #[derive(Debug, Clone)]
@@ -115,7 +115,6 @@ impl Animation for Shift {
 }
 
 /// Scale animation - requires mobjects to implement scaling
-/// For now this is a placeholder that could be expanded
 #[derive(Debug, Clone)]
 pub struct Scale {
     target: MobjectId,
@@ -157,9 +156,6 @@ impl Animation for Scale {
 
     fn apply(&self, _mobject: &mut dyn Mobject, t: f32) {
         let _eased_t = self.easing.apply(t);
-        // Scale requires additional Mobject trait methods
-        // For now, this is a placeholder. To implement:
-        // 1. Add set_scale() to Mobject trait
         // 2. Interpolate from 1.0 to self.factor based on eased_t
     }
 
@@ -215,9 +211,6 @@ impl Animation for Rotate {
 
     fn apply(&self, _mobject: &mut dyn Mobject, t: f32) {
         let _eased_t = self.easing.apply(t);
-        // Rotation requires additional Mobject trait methods
-        // For now, this is a placeholder. To implement:
-        // 1. Add set_rotation() to Mobject trait
         // 2. Interpolate from 0.0 to self.angle based on eased_t
     }
 
