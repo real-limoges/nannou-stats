@@ -29,8 +29,8 @@ pub mod prelude {
     // Mobjects
     pub use crate::mobject::{Arrow, Circle, Line, Rectangle};
     pub use crate::mobject::{Axes2D, Axes3D};
-    pub use crate::mobject::{ConfidenceBand, Curve, MarkerShape, ScatterPlot};
     pub use crate::mobject::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
+    pub use crate::mobject::{ConfidenceBand, Curve, MarkerShape, ScatterPlot};
 
     // Animations
     pub use crate::animation::{Animation, Easing};

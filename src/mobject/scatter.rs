@@ -1,4 +1,4 @@
-use super::{to_screen, BoundingRect, Mobject, MobjectId, MobjectStyle};
+use super::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
 use macroquad::prelude::*;
 
 /// Point marker shapes for scatter plots
@@ -147,7 +147,12 @@ impl Mobject for ScatterPlot {
             match self.marker {
                 MarkerShape::Circle => {
                     if fill_with_opacity.a > 0.0 {
-                        draw_circle(screen_pos.x, screen_pos.y, self.point_radius, fill_with_opacity);
+                        draw_circle(
+                            screen_pos.x,
+                            screen_pos.y,
+                            self.point_radius,
+                            fill_with_opacity,
+                        );
                     }
 
                     if style.stroke_color.a > 0.0 {

@@ -223,7 +223,13 @@ async fn main() {
         let bar_x = screen_center.x - bar_width / 2.0;
 
         draw_rectangle(bar_x, bar_y, bar_width, 4.0, Color::new(0.3, 0.3, 0.3, 1.0));
-        draw_rectangle(bar_x, bar_y, bar_width * progress, 4.0, Color::new(0.3, 0.6, 1.0, 1.0));
+        draw_rectangle(
+            bar_x,
+            bar_y,
+            bar_width * progress,
+            4.0,
+            Color::new(0.3, 0.6, 1.0, 1.0),
+        );
 
         // Draw time text
         let time_text = format!(

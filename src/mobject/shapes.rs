@@ -1,4 +1,4 @@
-use super::{to_screen, BoundingRect, Mobject, MobjectId, MobjectStyle};
+use super::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
 use macroquad::prelude::*;
 
 /// A circle mobject
@@ -331,7 +331,10 @@ impl Mobject for Rectangle {
         ];
 
         // Convert to screen coordinates
-        let screen_corners: Vec<Vec2> = corners.iter().map(|c| to_screen(*c, screen_center)).collect();
+        let screen_corners: Vec<Vec2> = corners
+            .iter()
+            .map(|c| to_screen(*c, screen_center))
+            .collect();
 
         // Draw fill
         if style.fill_color.a > 0.0 {
@@ -514,12 +517,7 @@ impl Mobject for Arrow {
             let screen_left = to_screen(left, screen_center);
             let screen_right = to_screen(right, screen_center);
 
-            draw_triangle(
-                screen_tip,
-                screen_left,
-                screen_right,
-                style.stroke_color,
-            );
+            draw_triangle(screen_tip, screen_left, screen_right, style.stroke_color);
         }
     }
 

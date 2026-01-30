@@ -1,4 +1,4 @@
-use super::{to_screen, BoundingRect, Mobject, MobjectId, MobjectStyle};
+use super::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
 use macroquad::prelude::*;
 
 /// A curve mobject for drawing smooth lines through points.
@@ -296,14 +296,28 @@ impl Mobject for ConfidenceBand {
             for i in 0..points_to_draw.saturating_sub(1) {
                 let p1 = to_screen(self.center + self.lower[i], screen_center);
                 let p2 = to_screen(self.center + self.lower[i + 1], screen_center);
-                draw_line(p1.x, p1.y, p2.x, p2.y, style.stroke_weight, style.stroke_color);
+                draw_line(
+                    p1.x,
+                    p1.y,
+                    p2.x,
+                    p2.y,
+                    style.stroke_weight,
+                    style.stroke_color,
+                );
             }
 
             // Upper bound line
             for i in 0..points_to_draw.saturating_sub(1) {
                 let p1 = to_screen(self.center + self.upper[i], screen_center);
                 let p2 = to_screen(self.center + self.upper[i + 1], screen_center);
-                draw_line(p1.x, p1.y, p2.x, p2.y, style.stroke_weight, style.stroke_color);
+                draw_line(
+                    p1.x,
+                    p1.y,
+                    p2.x,
+                    p2.y,
+                    style.stroke_weight,
+                    style.stroke_color,
+                );
             }
         }
     }

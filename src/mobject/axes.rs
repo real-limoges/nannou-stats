@@ -1,4 +1,4 @@
-use super::{to_screen, BoundingRect, Mobject, MobjectId, MobjectStyle};
+use super::{BoundingRect, Mobject, MobjectId, MobjectStyle, to_screen};
 use macroquad::prelude::*;
 
 /// 2D coordinate axes with configurable ranges and styling
