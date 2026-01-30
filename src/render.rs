@@ -1,4 +1,4 @@
-use nannou::prelude::*;
+use macroquad::prelude::*;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -85,11 +85,11 @@ pub struct Renderer;
 impl Renderer {
     /// Render a scene to frames (Simplified)
     /// I have a lot of xtra stuff to do  here
-    /// integrates into nannou's App/Model pattern
+    /// integrates into macroquad's async main pattern
     pub fn render_frames(
         scene: &mut Scene,
         config: &RenderConfig,
-        _draw_fn: impl Fn(&Draw, &mut Scene, f32),
+        _draw_fn: impl Fn(&mut Scene, f32, Vec2),
     ) -> std::io::Result<Vec<PathBuf>> {
         std::fs::create_dir_all(&config.output_dir)?;
 
@@ -103,8 +103,8 @@ impl Renderer {
             let _time = frame as f32 * frame_duration;
             let frame_path = config.output_dir.join(format!("frame_{:05}.png", frame));
 
-            // The actual drawing would be done by the draw function (which accesses nannou)
-            // draw_fn(&draw, scene, time);
+            // The actual drawing would be done by the draw function (which accesses macroquad)
+            // draw_fn(scene, time, screen_center);
 
             frame_paths.push(frame_path);
         }
@@ -151,16 +151,15 @@ impl Renderer {
 }
 
 pub trait Renderable {
-    fn render_frame(&mut self, draw: &Draw, time: f32);
+    fn render_frame(&mut self, time: f32, screen_center: Vec2);
 
     fn duration(&self) -> f32;
 }
 
 impl Renderable for Scene {
-    fn render_frame(&mut self, draw: &Draw, time: f32) {
-        draw.background().color(self.background_color());
-
-        self.draw_at(draw, time);
+    fn render_frame(&mut self, time: f32, screen_center: Vec2) {
+        clear_background(self.background_color());
+        self.draw_at(time, screen_center);
     }
 
     fn duration(&self) -> f32 {

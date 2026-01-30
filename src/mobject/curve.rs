@@ -1,5 +1,5 @@
-use super::{Mobject, MobjectId, MobjectStyle};
-use nannou::prelude::*;
+use super::{to_screen, BoundingRect, Mobject, MobjectId, MobjectStyle};
+use macroquad::prelude::*;
 
 /// A curve mobject for drawing smooth lines through points.
 /// Useful for plotting GAM fits, regression lines, and function graphs.
@@ -9,6 +9,8 @@ pub struct Curve {
     center: Vec2,
     points: Vec<Vec2>,
     style: MobjectStyle,
+    scale: f32,
+    rotation: f32,
 }
 
 impl Curve {
@@ -18,11 +20,13 @@ impl Curve {
             center: Vec2::ZERO,
             points: Vec::new(),
             style: MobjectStyle {
-                stroke_color: rgba(1.0, 0.4, 0.4, 1.0),
-                fill_color: rgba(0.0, 0.0, 0.0, 0.0),
+                stroke_color: Color::new(1.0, 0.4, 0.4, 1.0),
+                fill_color: Color::new(0.0, 0.0, 0.0, 0.0),
                 stroke_weight: 2.5,
                 opacity: 1.0,
             },
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -55,8 +59,8 @@ impl Curve {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
@@ -85,7 +89,7 @@ impl Default for Curve {
 }
 
 impl Mobject for Curve {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         if self.points.len() < 2 {
             return;
         }
@@ -96,21 +100,27 @@ impl Mobject for Curve {
         let points_to_draw = ((self.points.len() as f32) * t).ceil() as usize;
         let points_to_draw = points_to_draw.max(2).min(self.points.len());
 
-        // Offset points by center
+        // Convert points to screen coordinates and draw line segments
         let screen_points: Vec<Vec2> = self.points[..points_to_draw]
             .iter()
-            .map(|p| self.center + *p)
+            .map(|p| to_screen(self.center + *p, screen_center))
             .collect();
 
-        draw.polyline()
-            .weight(style.stroke_weight)
-            .points(screen_points)
-            .color(style.stroke_color);
+        for i in 0..screen_points.len().saturating_sub(1) {
+            draw_line(
+                screen_points[i].x,
+                screen_points[i].y,
+                screen_points[i + 1].x,
+                screen_points[i + 1].y,
+                style.stroke_weight,
+                style.stroke_color,
+            );
+        }
     }
 
-    fn bounding_box(&self) -> Rect {
+    fn bounding_box(&self) -> BoundingRect {
         if self.points.is_empty() {
-            return Rect::from_xy_wh(self.center, Vec2::ZERO);
+            return BoundingRect::from_xy_wh(self.center, Vec2::ZERO);
         }
 
         let min = self
@@ -122,7 +132,7 @@ impl Mobject for Curve {
             .iter()
             .fold(Vec2::splat(f32::MIN), |acc, p| acc.max(*p));
 
-        Rect::from_corners(self.center + min, self.center + max)
+        BoundingRect::from_corners(self.center + min, self.center + max)
     }
 
     fn center(&self) -> Vec2 {
@@ -139,6 +149,22 @@ impl Mobject for Curve {
 
     fn set_opacity(&mut self, opacity: f32) {
         self.style.opacity = opacity;
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
     }
 
     fn id(&self) -> MobjectId {
@@ -159,6 +185,8 @@ pub struct ConfidenceBand {
     upper: Vec<Vec2>,
     lower: Vec<Vec2>,
     style: MobjectStyle,
+    scale: f32,
+    rotation: f32,
 }
 
 impl ConfidenceBand {
@@ -169,11 +197,13 @@ impl ConfidenceBand {
             upper: Vec::new(),
             lower: Vec::new(),
             style: MobjectStyle {
-                stroke_color: rgba(0.0, 0.0, 0.0, 0.0),
-                fill_color: rgba(1.0, 0.4, 0.4, 0.2),
+                stroke_color: Color::new(0.0, 0.0, 0.0, 0.0),
+                fill_color: Color::new(1.0, 0.4, 0.4, 0.2),
                 stroke_weight: 0.0,
                 opacity: 1.0,
             },
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -211,13 +241,13 @@ impl ConfidenceBand {
         self
     }
 
-    pub fn fill(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.fill_color = color.into();
+    pub fn fill(mut self, color: Color) -> Self {
+        self.style.fill_color = color;
         self
     }
 
-    pub fn stroke_color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn stroke_color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
@@ -234,7 +264,7 @@ impl Default for ConfidenceBand {
 }
 
 impl Mobject for ConfidenceBand {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         if self.lower.len() < 2 || self.upper.len() < 2 {
             return;
         }
@@ -246,50 +276,41 @@ impl Mobject for ConfidenceBand {
         let points_to_draw = ((n as f32) * t).ceil() as usize;
         let points_to_draw = points_to_draw.max(2).min(n);
 
-        // Create a polygon: lower points forward, then upper points backward
-        let mut polygon_points: Vec<Vec2> = Vec::with_capacity(points_to_draw * 2);
+        // Draw fill as triangles (triangle strip approach)
+        if style.fill_color.a > 0.0 && points_to_draw >= 2 {
+            for i in 0..points_to_draw - 1 {
+                let lower_left = to_screen(self.center + self.lower[i], screen_center);
+                let lower_right = to_screen(self.center + self.lower[i + 1], screen_center);
+                let upper_left = to_screen(self.center + self.upper[i], screen_center);
+                let upper_right = to_screen(self.center + self.upper[i + 1], screen_center);
 
-        // Add lower points (left to right)
-        for p in self.lower[..points_to_draw].iter() {
-            polygon_points.push(self.center + *p);
+                // Draw two triangles to form a quad
+                draw_triangle(lower_left, lower_right, upper_left, style.fill_color);
+                draw_triangle(upper_left, lower_right, upper_right, style.fill_color);
+            }
         }
 
-        // Add upper points (right to left)
-        for p in self.upper[..points_to_draw].iter().rev() {
-            polygon_points.push(self.center + *p);
-        }
+        // Draw stroke outlines if needed
+        if style.stroke_color.a > 0.0 {
+            // Lower bound line
+            for i in 0..points_to_draw.saturating_sub(1) {
+                let p1 = to_screen(self.center + self.lower[i], screen_center);
+                let p2 = to_screen(self.center + self.lower[i + 1], screen_center);
+                draw_line(p1.x, p1.y, p2.x, p2.y, style.stroke_weight, style.stroke_color);
+            }
 
-        if style.fill_color.alpha > 0.0 && polygon_points.len() >= 3 {
-            draw.polygon()
-                .points(polygon_points.clone())
-                .color(style.fill_color);
-        }
-
-        if style.stroke_color.alpha > 0.0 {
-            let lower_screen: Vec<Vec2> = self.lower[..points_to_draw]
-                .iter()
-                .map(|p| self.center + *p)
-                .collect();
-            let upper_screen: Vec<Vec2> = self.upper[..points_to_draw]
-                .iter()
-                .map(|p| self.center + *p)
-                .collect();
-
-            draw.polyline()
-                .weight(style.stroke_weight)
-                .points(lower_screen)
-                .color(style.stroke_color);
-
-            draw.polyline()
-                .weight(style.stroke_weight)
-                .points(upper_screen)
-                .color(style.stroke_color);
+            // Upper bound line
+            for i in 0..points_to_draw.saturating_sub(1) {
+                let p1 = to_screen(self.center + self.upper[i], screen_center);
+                let p2 = to_screen(self.center + self.upper[i + 1], screen_center);
+                draw_line(p1.x, p1.y, p2.x, p2.y, style.stroke_weight, style.stroke_color);
+            }
         }
     }
 
-    fn bounding_box(&self) -> Rect {
+    fn bounding_box(&self) -> BoundingRect {
         if self.lower.is_empty() && self.upper.is_empty() {
-            return Rect::from_xy_wh(self.center, Vec2::ZERO);
+            return BoundingRect::from_xy_wh(self.center, Vec2::ZERO);
         }
 
         let all_points = self.lower.iter().chain(self.upper.iter());
@@ -298,7 +319,7 @@ impl Mobject for ConfidenceBand {
             .fold(Vec2::splat(f32::MAX), |acc, p| acc.min(*p));
         let max = all_points.fold(Vec2::splat(f32::MIN), |acc, p| acc.max(*p));
 
-        Rect::from_corners(self.center + min, self.center + max)
+        BoundingRect::from_corners(self.center + min, self.center + max)
     }
 
     fn center(&self) -> Vec2 {
@@ -315,6 +336,22 @@ impl Mobject for ConfidenceBand {
 
     fn set_opacity(&mut self, opacity: f32) {
         self.style.opacity = opacity;
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
     }
 
     fn id(&self) -> MobjectId {

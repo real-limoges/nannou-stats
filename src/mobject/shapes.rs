@@ -1,5 +1,5 @@
-use super::{Mobject, MobjectId, MobjectStyle};
-use nannou::prelude::*;
+use super::{to_screen, BoundingRect, Mobject, MobjectId, MobjectStyle};
+use macroquad::prelude::*;
 
 /// A circle mobject
 #[derive(Debug, Clone)]
@@ -8,6 +8,8 @@ pub struct Circle {
     center: Vec2,
     radius: f32,
     style: MobjectStyle,
+    scale: f32,
+    rotation: f32,
 }
 
 impl Circle {
@@ -17,6 +19,8 @@ impl Circle {
             center: Vec2::ZERO,
             radius: 1.0,
             style: MobjectStyle::default(),
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -30,13 +34,13 @@ impl Circle {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
-    pub fn fill(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.fill_color = color.into();
+    pub fn fill(mut self, color: Color) -> Self {
+        self.style.fill_color = color;
         self
     }
 
@@ -53,8 +57,9 @@ impl Default for Circle {
 }
 
 impl Mobject for Circle {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         let style = self.style.with_opacity(self.style.opacity);
+        let screen_pos = to_screen(self.center, screen_center);
 
         // For partial drawing (Create animation), only draw arc up to t
         let resolution = 64;
@@ -65,41 +70,44 @@ impl Mobject for Circle {
         }
 
         // Draw fill if present
-        if style.fill_color.alpha > 0.0 {
-            draw.ellipse()
-                .xy(self.center)
-                .radius(self.radius)
-                .color(style.fill_color);
+        if style.fill_color.a > 0.0 {
+            draw_circle(screen_pos.x, screen_pos.y, self.radius, style.fill_color);
         }
 
         // Draw stroke
         if t >= 1.0 {
-            draw.ellipse()
-                .xy(self.center)
-                .radius(self.radius)
-                .no_fill()
-                .stroke(style.stroke_color)
-                .stroke_weight(style.stroke_weight);
+            draw_circle_lines(
+                screen_pos.x,
+                screen_pos.y,
+                self.radius,
+                style.stroke_weight,
+                style.stroke_color,
+            );
         } else {
-            // Partial stroke for animation
+            // Partial stroke for animation - draw as connected line segments
             let points: Vec<Vec2> = (0..=points_to_draw)
                 .map(|i| {
-                    let angle = (i as f32 / resolution as f32) * TAU;
-                    self.center + Vec2::new(angle.cos(), angle.sin()) * self.radius
+                    let angle = (i as f32 / resolution as f32) * std::f32::consts::TAU;
+                    let local_pos = self.center + Vec2::new(angle.cos(), angle.sin()) * self.radius;
+                    to_screen(local_pos, screen_center)
                 })
                 .collect();
 
-            if points.len() >= 2 {
-                draw.polyline()
-                    .weight(style.stroke_weight)
-                    .points(points)
-                    .color(style.stroke_color);
+            for i in 0..points.len().saturating_sub(1) {
+                draw_line(
+                    points[i].x,
+                    points[i].y,
+                    points[i + 1].x,
+                    points[i + 1].y,
+                    style.stroke_weight,
+                    style.stroke_color,
+                );
             }
         }
     }
 
-    fn bounding_box(&self) -> Rect {
-        Rect::from_xy_wh(self.center, Vec2::splat(self.radius * 2.0))
+    fn bounding_box(&self) -> BoundingRect {
+        BoundingRect::from_xy_wh(self.center, Vec2::splat(self.radius * 2.0))
     }
 
     fn center(&self) -> Vec2 {
@@ -118,6 +126,22 @@ impl Mobject for Circle {
         self.style.opacity = opacity;
     }
 
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
+    }
+
     fn id(&self) -> MobjectId {
         self.id
     }
@@ -134,6 +158,8 @@ pub struct Line {
     start: Vec2,
     end: Vec2,
     style: MobjectStyle,
+    scale: f32,
+    rotation: f32,
 }
 
 impl Line {
@@ -143,6 +169,8 @@ impl Line {
             start,
             end,
             style: MobjectStyle::default(),
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -152,8 +180,8 @@ impl Line {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
@@ -164,21 +192,27 @@ impl Line {
 }
 
 impl Mobject for Line {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         let style = self.style.with_opacity(self.style.opacity);
         let current_end = self.start.lerp(self.end, t);
 
-        draw.line()
-            .start(self.start)
-            .end(current_end)
-            .color(style.stroke_color)
-            .stroke_weight(style.stroke_weight);
+        let screen_start = to_screen(self.start, screen_center);
+        let screen_end = to_screen(current_end, screen_center);
+
+        draw_line(
+            screen_start.x,
+            screen_start.y,
+            screen_end.x,
+            screen_end.y,
+            style.stroke_weight,
+            style.stroke_color,
+        );
     }
 
-    fn bounding_box(&self) -> Rect {
+    fn bounding_box(&self) -> BoundingRect {
         let min = self.start.min(self.end);
         let max = self.start.max(self.end);
-        Rect::from_corners(min, max)
+        BoundingRect::from_corners(min, max)
     }
 
     fn center(&self) -> Vec2 {
@@ -197,6 +231,22 @@ impl Mobject for Line {
 
     fn set_opacity(&mut self, opacity: f32) {
         self.style.opacity = opacity;
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
     }
 
     fn id(&self) -> MobjectId {
@@ -216,6 +266,8 @@ pub struct Rectangle {
     width: f32,
     height: f32,
     style: MobjectStyle,
+    scale: f32,
+    rotation: f32,
 }
 
 impl Rectangle {
@@ -226,6 +278,8 @@ impl Rectangle {
             width: 2.0,
             height: 1.0,
             style: MobjectStyle::default(),
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -240,13 +294,13 @@ impl Rectangle {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
-    pub fn fill(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.fill_color = color.into();
+    pub fn fill(mut self, color: Color) -> Self {
+        self.style.fill_color = color;
         self
     }
 
@@ -263,12 +317,12 @@ impl Default for Rectangle {
 }
 
 impl Mobject for Rectangle {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         let style = self.style.with_opacity(self.style.opacity);
         let hw = self.width / 2.0;
         let hh = self.height / 2.0;
 
-        // Corner points
+        // Corner points in center-origin coordinates
         let corners = [
             self.center + vec2(-hw, -hh),
             self.center + vec2(hw, -hh),
@@ -276,12 +330,19 @@ impl Mobject for Rectangle {
             self.center + vec2(-hw, hh),
         ];
 
+        // Convert to screen coordinates
+        let screen_corners: Vec<Vec2> = corners.iter().map(|c| to_screen(*c, screen_center)).collect();
+
         // Draw fill
-        if style.fill_color.alpha > 0.0 {
-            draw.rect()
-                .xy(self.center)
-                .w_h(self.width, self.height)
-                .color(style.fill_color);
+        if style.fill_color.a > 0.0 {
+            let screen_pos = to_screen(self.center, screen_center);
+            draw_rectangle(
+                screen_pos.x - hw,
+                screen_pos.y - hh,
+                self.width,
+                self.height,
+                style.fill_color,
+            );
         }
 
         // Draw stroke with animation progress
@@ -289,12 +350,18 @@ impl Mobject for Rectangle {
         let draw_length = perimeter * t;
 
         if t >= 1.0 {
-            draw.rect()
-                .xy(self.center)
-                .w_h(self.width, self.height)
-                .no_fill()
-                .stroke(style.stroke_color)
-                .stroke_weight(style.stroke_weight);
+            // Draw complete rectangle outline
+            for i in 0..4 {
+                let next = (i + 1) % 4;
+                draw_line(
+                    screen_corners[i].x,
+                    screen_corners[i].y,
+                    screen_corners[next].x,
+                    screen_corners[next].y,
+                    style.stroke_weight,
+                    style.stroke_color,
+                );
+            }
         } else {
             // Partial stroke
             let mut remaining = draw_length;
@@ -313,19 +380,25 @@ impl Mobject for Rectangle {
                 let t_edge = (remaining / edge_len).min(1.0);
                 let current_end = start.lerp(end, t_edge);
 
-                draw.line()
-                    .start(start)
-                    .end(current_end)
-                    .color(style.stroke_color)
-                    .stroke_weight(style.stroke_weight);
+                let screen_start = to_screen(start, screen_center);
+                let screen_end = to_screen(current_end, screen_center);
+
+                draw_line(
+                    screen_start.x,
+                    screen_start.y,
+                    screen_end.x,
+                    screen_end.y,
+                    style.stroke_weight,
+                    style.stroke_color,
+                );
 
                 remaining -= edge_len;
             }
         }
     }
 
-    fn bounding_box(&self) -> Rect {
-        Rect::from_xy_wh(self.center, vec2(self.width, self.height))
+    fn bounding_box(&self) -> BoundingRect {
+        BoundingRect::from_xy_wh(self.center, vec2(self.width, self.height))
     }
 
     fn center(&self) -> Vec2 {
@@ -342,6 +415,22 @@ impl Mobject for Rectangle {
 
     fn set_opacity(&mut self, opacity: f32) {
         self.style.opacity = opacity;
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
     }
 
     fn id(&self) -> MobjectId {
@@ -361,6 +450,8 @@ pub struct Arrow {
     end: Vec2,
     tip_size: f32,
     style: MobjectStyle,
+    scale: f32,
+    rotation: f32,
 }
 
 impl Arrow {
@@ -371,6 +462,8 @@ impl Arrow {
             end,
             tip_size: 10.0,
             style: MobjectStyle::default(),
+            scale: 1.0,
+            rotation: 0.0,
         }
     }
 
@@ -379,8 +472,8 @@ impl Arrow {
         self
     }
 
-    pub fn color(mut self, color: impl Into<Rgba>) -> Self {
-        self.style.stroke_color = color.into();
+    pub fn color(mut self, color: Color) -> Self {
+        self.style.stroke_color = color;
         self
     }
 
@@ -391,16 +484,22 @@ impl Arrow {
 }
 
 impl Mobject for Arrow {
-    fn draw(&self, draw: &Draw, t: f32) {
+    fn draw(&self, t: f32, screen_center: Vec2) {
         let style = self.style.with_opacity(self.style.opacity);
         let current_end = self.start.lerp(self.end, t);
 
+        let screen_start = to_screen(self.start, screen_center);
+        let screen_end = to_screen(current_end, screen_center);
+
         // Draw line
-        draw.line()
-            .start(self.start)
-            .end(current_end)
-            .color(style.stroke_color)
-            .stroke_weight(style.stroke_weight);
+        draw_line(
+            screen_start.x,
+            screen_start.y,
+            screen_end.x,
+            screen_end.y,
+            style.stroke_weight,
+            style.stroke_color,
+        );
 
         // Draw arrowhead only when line reaches near end
         if t > 0.9 {
@@ -411,16 +510,23 @@ impl Mobject for Arrow {
             let left = tip - dir * self.tip_size + perp * self.tip_size * 0.5;
             let right = tip - dir * self.tip_size - perp * self.tip_size * 0.5;
 
-            draw.tri()
-                .points(tip, left, right)
-                .color(style.stroke_color);
+            let screen_tip = to_screen(tip, screen_center);
+            let screen_left = to_screen(left, screen_center);
+            let screen_right = to_screen(right, screen_center);
+
+            draw_triangle(
+                screen_tip,
+                screen_left,
+                screen_right,
+                style.stroke_color,
+            );
         }
     }
 
-    fn bounding_box(&self) -> Rect {
+    fn bounding_box(&self) -> BoundingRect {
         let min = self.start.min(self.end);
         let max = self.start.max(self.end);
-        Rect::from_corners(min, max)
+        BoundingRect::from_corners(min, max)
     }
 
     fn center(&self) -> Vec2 {
@@ -439,6 +545,22 @@ impl Mobject for Arrow {
 
     fn set_opacity(&mut self, opacity: f32) {
         self.style.opacity = opacity;
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn rotate(&mut self, angle: f32) {
+        self.rotation += angle;
+    }
+
+    fn set_rotate(&mut self, angle: f32) {
+        self.rotation = angle;
     }
 
     fn id(&self) -> MobjectId {

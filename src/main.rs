@@ -1,41 +1,32 @@
-use nannou::prelude::*;
-use nannou_stats::prelude::*;
+use macroquad::prelude::*;
+use maquette::prelude::{
+    Axes2D, Circle as MobjectCircle, Easing, FadeIn, MoveTo, Scene, to_screen,
+};
 
-/// Application model
-struct Model {
-    scene: Scene,
-    time: f32,
-    playing: bool,
-    circle_id: MobjectId,
-    axes_id: MobjectId,
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Maquette Demo".to_owned(),
+        window_width: 1280,
+        window_height: 720,
+        ..Default::default()
+    }
 }
 
-fn main() {
-    nannou::app(model).update(update).run();
-}
-
-fn model(app: &App) -> Model {
-    app.new_window()
-        .size(1280, 720)
-        .title("Nannou-Stats Demo")
-        .view(view)
-        .key_pressed(key_pressed)
-        .build()
-        .unwrap();
-
-    let mut scene = Scene::new().background(rgba(0.0, 0.0, 0.0, 1.0));
+#[macroquad::main(window_conf)]
+async fn main() {
+    let mut scene = Scene::new().background(Color::new(0.0, 0.0, 0.0, 1.0));
 
     let axes = Axes2D::new()
         .x_range(-4.0, 4.0)
         .y_range(-3.0, 3.0)
         .scale(80.0)
-        .color(rgba(0.5, 0.5, 0.5, 1.0));
+        .color(Color::new(0.5, 0.5, 0.5, 1.0));
 
-    let circle = Circle::new()
+    let circle = MobjectCircle::new()
         .radius(30.0)
         .at(vec2(-200.0, 0.0))
-        .color(rgba(0.3, 0.6, 1.0, 1.0))
-        .fill(rgba(0.3, 0.6, 1.0, 0.3));
+        .color(Color::new(0.3, 0.6, 1.0, 1.0))
+        .fill(Color::new(0.3, 0.6, 1.0, 0.3));
 
     let axes_id = scene.add(axes);
     let circle_id = scene.add(circle);
@@ -67,200 +58,188 @@ fn model(app: &App) -> Model {
     println!("Animation duration: {:.2}s", scene.duration());
     println!("Press SPACE to play/pause, R to restart");
 
-    Model {
-        scene,
-        time: 0.0,
-        playing: true,
-        circle_id,
-        axes_id,
-    }
-}
+    let mut time = 0.0f32;
+    let mut playing = true;
 
-fn update(_app: &App, model: &mut Model, update: Update) {
-    if model.playing {
-        model.time += update.since_last.as_secs_f32();
-
-        if model.time > model.scene.duration() + 1.0 {
-            model.time = 0.0;
-
-            if let Some(m) = model.scene.get_mut(model.circle_id) {
-                m.set_opacity(0.0);
-                m.set_center(vec2(-200.0, 0.0));
-            }
-            if let Some(m) = model.scene.get_mut(model.axes_id) {
-                m.set_opacity(0.0);
-            }
+    loop {
+        // Input handling
+        if is_key_pressed(KeyCode::Space) {
+            playing = !playing;
+            println!("Playing: {}", playing);
         }
-    }
-}
 
-fn view(app: &App, model: &Model, frame: Frame) {
-    let draw = app.draw();
-
-    // Clear background
-    draw.background().color(model.scene.background_color());
-
-    let total_time = model.time;
-
-    // Calculate axes opacity
-    let axes_opacity = if total_time < 1.0 {
-        Easing::Smooth.apply(total_time / 1.0)
-    } else {
-        1.0
-    };
-
-    // Calculate circle opacity
-    let circle_fade_start = 1.2;
-    let circle_fade_end = 1.7;
-    let circle_opacity = if total_time < circle_fade_start {
-        0.0
-    } else if total_time < circle_fade_end {
-        Easing::Smooth.apply((total_time - circle_fade_start) / 0.5)
-    } else {
-        1.0
-    };
-
-    // Calculate circle position
-    let move1_start = 2.0;
-    let move1_end = 3.5;
-    let move2_start = 3.7;
-    let move2_end = 4.7;
-    let move3_start = 4.9;
-    let move3_end = 5.7;
-
-    let start_pos = vec2(-200.0, 0.0);
-    let pos1 = vec2(200.0, 100.0);
-    let pos2 = vec2(-100.0, -80.0);
-    let pos3 = vec2(0.0, 0.0);
-
-    let circle_pos = if total_time < move1_start {
-        start_pos
-    } else if total_time < move1_end {
-        let t = (total_time - move1_start) / 1.5;
-        start_pos.lerp(pos1, Easing::EaseInOutCubic.apply(t))
-    } else if total_time < move2_start {
-        pos1
-    } else if total_time < move2_end {
-        let t = (total_time - move2_start) / 1.0;
-        pos1.lerp(pos2, Easing::EaseOutBack.apply(t))
-    } else if total_time < move3_start {
-        pos2
-    } else if total_time < move3_end {
-        let t = (total_time - move3_start) / 0.8;
-        pos2.lerp(pos3, Easing::Smooth.apply(t))
-    } else {
-        pos3
-    };
-
-    // Draw axes
-    let scale = 80.0;
-    let axes_color = rgba(0.5, 0.5, 0.5, axes_opacity);
-
-    // X-axis
-    draw.line()
-        .start(vec2(-4.0 * scale, 0.0))
-        .end(vec2(4.0 * scale, 0.0))
-        .color(axes_color)
-        .stroke_weight(2.0);
-
-    // Y-axis
-    draw.line()
-        .start(vec2(0.0, -3.0 * scale))
-        .end(vec2(0.0, 3.0 * scale))
-        .color(axes_color)
-        .stroke_weight(2.0);
-
-    // Draw ticks (fade in after axes)
-    if axes_opacity > 0.5 {
-        let tick_alpha = ((axes_opacity - 0.5) * 2.0).min(1.0);
-        let tick_color = rgba(0.5, 0.5, 0.5, tick_alpha);
-
-        for i in -4..=4 {
-            if i != 0 {
-                let x = i as f32 * scale;
-                draw.line()
-                    .start(vec2(x, -5.0))
-                    .end(vec2(x, 5.0))
-                    .color(tick_color)
-                    .stroke_weight(1.0);
-            }
-        }
-        for i in -3..=3 {
-            if i != 0 {
-                let y = i as f32 * scale;
-                draw.line()
-                    .start(vec2(-5.0, y))
-                    .end(vec2(5.0, y))
-                    .color(tick_color)
-                    .stroke_weight(1.0);
-            }
-        }
-    }
-
-    // Draw circle
-    if circle_opacity > 0.0 {
-        let circle_stroke = rgba(0.3, 0.6, 1.0, circle_opacity);
-        let circle_fill = rgba(0.3, 0.6, 1.0, circle_opacity * 0.3);
-
-        draw.ellipse()
-            .xy(circle_pos)
-            .radius(30.0)
-            .color(circle_fill);
-
-        draw.ellipse()
-            .xy(circle_pos)
-            .radius(30.0)
-            .no_fill()
-            .stroke(circle_stroke)
-            .stroke_weight(2.0);
-    }
-
-    // Draw progress bar
-    let progress = (model.time / model.scene.duration()).min(1.0);
-    let bar_width = 200.0;
-    let bar_y = -320.0;
-
-    draw.rect()
-        .xy(vec2(0.0, bar_y))
-        .w_h(bar_width, 4.0)
-        .color(rgba(0.3, 0.3, 0.3, 1.0));
-
-    draw.rect()
-        .xy(vec2(-bar_width / 2.0 + (bar_width * progress) / 2.0, bar_y))
-        .w_h(bar_width * progress, 4.0)
-        .color(rgba(0.3, 0.6, 1.0, 1.0));
-
-    // Draw time text
-    draw.text(&format!(
-        "{:.1}s / {:.1}s",
-        model.time.min(model.scene.duration()),
-        model.scene.duration()
-    ))
-    .xy(vec2(0.0, bar_y - 20.0))
-    .color(WHITE)
-    .font_size(14);
-
-    draw.to_frame(app, &frame).unwrap();
-}
-
-fn key_pressed(_app: &App, model: &mut Model, key: Key) {
-    match key {
-        Key::Space => {
-            model.playing = !model.playing;
-            println!("Playing: {}", model.playing);
-        }
-        Key::R => {
-            model.time = 0.0;
+        if is_key_pressed(KeyCode::R) {
+            time = 0.0;
             // Reset mobject states
-            if let Some(m) = model.scene.get_mut(model.circle_id) {
+            if let Some(m) = scene.get_mut(circle_id) {
                 m.set_opacity(0.0);
                 m.set_center(vec2(-200.0, 0.0));
             }
-            if let Some(m) = model.scene.get_mut(model.axes_id) {
+            if let Some(m) = scene.get_mut(axes_id) {
                 m.set_opacity(0.0);
             }
             println!("Restarted");
         }
-        _ => {}
+
+        // Update time
+        if playing {
+            time += get_frame_time();
+
+            if time > scene.duration() + 1.0 {
+                time = 0.0;
+
+                if let Some(m) = scene.get_mut(circle_id) {
+                    m.set_opacity(0.0);
+                    m.set_center(vec2(-200.0, 0.0));
+                }
+                if let Some(m) = scene.get_mut(axes_id) {
+                    m.set_opacity(0.0);
+                }
+            }
+        }
+
+        // Calculate screen center for coordinate transform
+        let screen_center = vec2(screen_width() / 2.0, screen_height() / 2.0);
+
+        // Clear background
+        clear_background(scene.background_color());
+
+        let total_time = time;
+
+        // Calculate axes opacity
+        let axes_opacity = if total_time < 1.0 {
+            Easing::Smooth.apply(total_time / 1.0)
+        } else {
+            1.0
+        };
+
+        // Calculate circle opacity
+        let circle_fade_start = 1.2;
+        let circle_fade_end = 1.7;
+        let circle_opacity = if total_time < circle_fade_start {
+            0.0
+        } else if total_time < circle_fade_end {
+            Easing::Smooth.apply((total_time - circle_fade_start) / 0.5)
+        } else {
+            1.0
+        };
+
+        // Calculate circle position
+        let move1_start = 2.0;
+        let move1_end = 3.5;
+        let move2_start = 3.7;
+        let move2_end = 4.7;
+        let move3_start = 4.9;
+        let move3_end = 5.7;
+
+        let start_pos = vec2(-200.0, 0.0);
+        let pos1 = vec2(200.0, 100.0);
+        let pos2 = vec2(-100.0, -80.0);
+        let pos3 = vec2(0.0, 0.0);
+
+        let circle_pos = if total_time < move1_start {
+            start_pos
+        } else if total_time < move1_end {
+            let t = (total_time - move1_start) / 1.5;
+            start_pos.lerp(pos1, Easing::EaseInOutCubic.apply(t))
+        } else if total_time < move2_start {
+            pos1
+        } else if total_time < move2_end {
+            let t = (total_time - move2_start) / 1.0;
+            pos1.lerp(pos2, Easing::EaseOutBack.apply(t))
+        } else if total_time < move3_start {
+            pos2
+        } else if total_time < move3_end {
+            let t = (total_time - move3_start) / 0.8;
+            pos2.lerp(pos3, Easing::Smooth.apply(t))
+        } else {
+            pos3
+        };
+
+        // Draw axes
+        let scale = 80.0;
+        let axes_color = Color::new(0.5, 0.5, 0.5, axes_opacity);
+
+        // X-axis
+        let x_start = to_screen(vec2(-4.0 * scale, 0.0), screen_center);
+        let x_end = to_screen(vec2(4.0 * scale, 0.0), screen_center);
+        draw_line(x_start.x, x_start.y, x_end.x, x_end.y, 2.0, axes_color);
+
+        // Y-axis
+        let y_start = to_screen(vec2(0.0, -3.0 * scale), screen_center);
+        let y_end = to_screen(vec2(0.0, 3.0 * scale), screen_center);
+        draw_line(y_start.x, y_start.y, y_end.x, y_end.y, 2.0, axes_color);
+
+        // Draw ticks (fade in after axes)
+        if axes_opacity > 0.5 {
+            let tick_alpha = ((axes_opacity - 0.5) * 2.0).min(1.0);
+            let tick_color = Color::new(0.5, 0.5, 0.5, tick_alpha);
+
+            for i in -4..=4 {
+                if i != 0 {
+                    let x = i as f32 * scale;
+                    let tick_pos = to_screen(vec2(x, 0.0), screen_center);
+                    draw_line(
+                        tick_pos.x,
+                        tick_pos.y - 5.0,
+                        tick_pos.x,
+                        tick_pos.y + 5.0,
+                        1.0,
+                        tick_color,
+                    );
+                }
+            }
+            for i in -3..=3 {
+                if i != 0 {
+                    let y = i as f32 * scale;
+                    let tick_pos = to_screen(vec2(0.0, y), screen_center);
+                    draw_line(
+                        tick_pos.x - 5.0,
+                        tick_pos.y,
+                        tick_pos.x + 5.0,
+                        tick_pos.y,
+                        1.0,
+                        tick_color,
+                    );
+                }
+            }
+        }
+
+        // Draw circle
+        if circle_opacity > 0.0 {
+            let circle_stroke = Color::new(0.3, 0.6, 1.0, circle_opacity);
+            let circle_fill = Color::new(0.3, 0.6, 1.0, circle_opacity * 0.3);
+
+            let screen_pos = to_screen(circle_pos, screen_center);
+
+            draw_circle(screen_pos.x, screen_pos.y, 30.0, circle_fill);
+            draw_circle_lines(screen_pos.x, screen_pos.y, 30.0, 2.0, circle_stroke);
+        }
+
+        // Draw progress bar
+        let progress = (time / scene.duration()).min(1.0);
+        let bar_width = 200.0;
+        let bar_y = screen_height() - 40.0;
+        let bar_x = screen_center.x - bar_width / 2.0;
+
+        draw_rectangle(bar_x, bar_y, bar_width, 4.0, Color::new(0.3, 0.3, 0.3, 1.0));
+        draw_rectangle(bar_x, bar_y, bar_width * progress, 4.0, Color::new(0.3, 0.6, 1.0, 1.0));
+
+        // Draw time text
+        let time_text = format!(
+            "{:.1}s / {:.1}s",
+            time.min(scene.duration()),
+            scene.duration()
+        );
+        let text_dimensions = measure_text(&time_text, None, 14, 1.0);
+        draw_text(
+            &time_text,
+            screen_center.x - text_dimensions.width / 2.0,
+            bar_y + 20.0,
+            14.0,
+            WHITE,
+        );
+
+        next_frame().await
     }
 }

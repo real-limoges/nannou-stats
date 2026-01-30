@@ -1,4 +1,4 @@
-use nannou::prelude::*;
+use macroquad::prelude::*;
 use std::collections::HashMap;
 
 use crate::animation::Animation;
@@ -26,7 +26,7 @@ pub struct Scene {
     mobjects: HashMap<MobjectId, Box<dyn Mobject>>,
     timeline: Timeline,
     camera: Camera,
-    background: Rgba,
+    background: Color,
 }
 
 impl Scene {
@@ -35,12 +35,12 @@ impl Scene {
             mobjects: HashMap::new(),
             timeline: Timeline::new(),
             camera: Camera::default(),
-            background: rgba(0.0, 0.0, 0.0, 1.0), // Black background
+            background: Color::new(0.0, 0.0, 0.0, 1.0), // Black background
         }
     }
 
-    pub fn background(mut self, color: impl Into<Rgba>) -> Self {
-        self.background = color.into();
+    pub fn background(mut self, color: Color) -> Self {
+        self.background = color;
         self
     }
 
@@ -100,7 +100,7 @@ impl Scene {
         self.timeline.total_duration()
     }
 
-    pub fn background_color(&self) -> Rgba {
+    pub fn background_color(&self) -> Color {
         self.background
     }
 
@@ -119,7 +119,8 @@ impl Scene {
     }
 
     /// Draw all mobjects at a specific time
-    pub fn draw_at(&mut self, draw: &Draw, time: f32) {
+    /// screen_center is the center of the screen in screen coordinates (for coordinate transform)
+    pub fn draw_at(&mut self, time: f32, screen_center: Vec2) {
         // Apply all active animations
         let active = self.timeline.active_at(time);
 
@@ -134,7 +135,7 @@ impl Scene {
         for (id, mobject) in &self.mobjects {
             // Get draw progress for Create-type animations
             let draw_progress = self.timeline.draw_progress_for(*id, time);
-            mobject.draw(draw, draw_progress);
+            mobject.draw(draw_progress, screen_center);
         }
     }
 
